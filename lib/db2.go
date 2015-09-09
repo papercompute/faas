@@ -1,4 +1,4 @@
-package db2
+package faas
 
 import (
   "log"
