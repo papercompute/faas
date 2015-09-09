@@ -28,7 +28,7 @@ func WriteStatus(w http.ResponseWriter, code int, status string) {
 func WriteJSON(w http.ResponseWriter, v interface{}) error {
   b, err := json.MarshalIndent(v, "", "  ")
   if err != nil {
-    log.Printf("WriteJSON error %v",err)
+    log.Printf("WriteJSON json.MarshalIndent error %v",err)
     return err
   }
   w.Header().Set("Content-Type", "application/json; charset=utf-8")

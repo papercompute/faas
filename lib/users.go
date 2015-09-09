@@ -132,7 +132,7 @@ func PostNewUser(w http.ResponseWriter, r *http.Request){
   }
 
   user := &userInfo{
-    Id:getUserId(),
+  //  Id:getUserId(),
     Created: time.Now().Format(time.RFC1123),
     Email:userPost.Email,
     PasswordHash:GetMD5Hash(userPost.Password),
@@ -158,6 +158,7 @@ func PostNewUser(w http.ResponseWriter, r *http.Request){
 }
 
 func GetUser(w http.ResponseWriter, r *http.Request){
+  
   content, err := ioutil.ReadAll(r.Body)
   if err != nil {
     log.Printf("GetUser ioutil.ReadAll error %v",err)
@@ -170,7 +171,7 @@ func GetUser(w http.ResponseWriter, r *http.Request){
     log.Printf("GetUser json.Unmarshal %v error",err)
     http.Error(w,"{\"status\" : \"json error\"}",http.StatusBadRequest)
     return
-  }
+  } 
 
   err,res:=GetKV([]byte(userGetReq.Email),[]byte("users"))
   if err!=nil{

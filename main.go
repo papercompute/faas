@@ -18,6 +18,7 @@ import (
 //	"regexp"
 //  "bytes"
 //  "runtime"
+  "github.com/julienschmidt/httprouter"
   "strings"
   "./lib"
 )
@@ -180,7 +181,7 @@ func (n *node) traverse(components []string, params url.Values) (*node, string) 
 
 */
 
-
+/*
 
 var fileServer = http.FileServer(http.Dir("public"))
 
@@ -217,7 +218,7 @@ func (e *Faas) ServeHTTP(w http.ResponseWriter, r *http.Request) {
   }
   http.NotFound(w, r)
 }
-
+*/
 
 
 func (e *Storage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -232,6 +233,7 @@ func (e *Storage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
   router.NotFound = http.FileServer(http.Dir("public")).ServeHTTP
   log.Fatal(http.ListenAndServe(":8000", router))
 */
+
 
 func main() {
 
@@ -274,16 +276,38 @@ func main() {
 // server setup
   finish := make(chan bool)
 
+
   go func() {
     log.Println("http.ListenAndServe Stora_host "+cfg.Stora_host);
-    h:=strings.Split(cfg.Stora_host, ":")
-    http.ListenAndServe(":"+h[1], &Storage{})
+    h:=strings.Split(cfg.Stora_host, ":")  
+    log.Fatal(http.ListenAndServe(":"+h[1], &Storage{}))
   }()
 
   go func() {
     log.Println("http.ListenAndServe Web_host "+cfg.Web_host);
     h:=strings.Split(cfg.Web_host, ":")
-    http.ListenAndServe(":"+h[1], &Faas{})
+    router := httprouter.New()
+    // curl -v -XPOST -d '123456789abcdef' 'http://localhost:8080/api/v1/set/mydata/mykey'
+    router.POST("/api/v1/set/:bucket/:key", func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      faas.PostTestKV(w,r,ps.ByName("bucket"),ps.ByName("key"))
+    })  
+    // curl -v -XGET 'http://localhost:8080/api/v1/set/mydata/mykey'
+    router.GET("/api/v1/get/:bucket/:key",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      faas.GetTestKV(w,r,ps.ByName("bucket"),ps.ByName("key"))
+    })
+    // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789"}' http://localhost:8080/api/v1/users
+    router.POST("/api/v1/users",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      faas.PostNewUser(w,r)
+    })
+    // curl -v -XGET -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com"}' http://localhost:8080/api/v1/users'
+    router.GET("/api/v1/users",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      faas.GetUser(w,r)
+    })
+
+    router.NotFound = http.FileServer(http.Dir("public"))
+
+
+    log.Fatal(http.ListenAndServe(":"+h[1], router))
   }()
 
   <-finish
