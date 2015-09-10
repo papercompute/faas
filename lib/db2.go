@@ -19,10 +19,21 @@ func UpdBucket(bucket []byte) error {
   return err
 }
 
+
+//var counter uint64 = 123412361276
+//func GenK()[]byte{
+//}
+
 func UpdKV(key []byte, value []byte, bucket []byte) error {
   return db.Update(func(tx *bolt.Tx) error {
     b := tx.Bucket(bucket)
     return b.Put(key, value)
+  })
+}
+func DelKV(key []byte, bucket []byte) error {
+  return db.Update(func(tx *bolt.Tx) error {
+    b := tx.Bucket(bucket)
+    return b.Delete(key)
   })
 }
 func GetKV(key []byte, bucket []byte) (error, []byte) {
@@ -35,6 +46,7 @@ func GetKV(key []byte, bucket []byte) (error, []byte) {
   })
   return err, result
 }
+
 
 func InitDB2(dbname *string, buckets []string){
   var err error 

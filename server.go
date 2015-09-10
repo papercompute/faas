@@ -18,7 +18,7 @@ import (
 //	"regexp"
 //  "bytes"
 //  "runtime"
-  "github.com/julienschmidt/httprouter"
+//  "github.com/julienschmidt/httprouter"
   "strings"
   "./lib"
 )
@@ -283,31 +283,10 @@ func main() {
     log.Fatal(http.ListenAndServe(":"+h[1], &Storage{}))
   }()
 
-  go func() {
-    log.Println("http.ListenAndServe Web_host "+cfg.Web_host);
+  go func() {    
+    log.Println("http.ListenAndServe Web_host "+cfg.Web_host);    
     h:=strings.Split(cfg.Web_host, ":")
-    router := httprouter.New()
-    // curl -v -XPOST -d '123456789abcdef' 'http://localhost:8080/api/v1/set/mydata/mykey'
-    router.POST("/api/v1/set/:bucket/:key", func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
-      faas.PostTestKV(w,r,ps.ByName("bucket"),ps.ByName("key"))
-    })  
-    // curl -v -XGET 'http://localhost:8080/api/v1/set/mydata/mykey'
-    router.GET("/api/v1/get/:bucket/:key",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
-      faas.GetTestKV(w,r,ps.ByName("bucket"),ps.ByName("key"))
-    })
-    // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789"}' http://localhost:8080/api/v1/users
-    router.POST("/api/v1/users",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
-      faas.PostNewUser(w,r)
-    })
-    // curl -v -XGET -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com"}' http://localhost:8080/api/v1/users'
-    router.GET("/api/v1/users",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
-      faas.GetUser(w,r)
-    })
-
-    router.NotFound = http.FileServer(http.Dir("public"))
-
-
-    log.Fatal(http.ListenAndServe(":"+h[1], router))
+    log.Fatal(faas.ListenAndServe(":"+h[1],"public"))
   }()
 
   <-finish

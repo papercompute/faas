@@ -8,7 +8,10 @@ import (
 //  "time"  
   "io/ioutil"
 //  "encoding/json"
+//  "crypto/rand"
+  "fmt"
 )
+
 
 
 /*
@@ -27,11 +30,11 @@ func DecodeJson(r *http.Request, v interface{}) error {
 // https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
 
 
-// curl -v -XPOST -d '123456789abcdef' 'http://localhost:8080/api/v1/set?bucket=mydata&key=mykey'
-func PostTestKV(w http.ResponseWriter, r *http.Request, bucket string, key string){
-  /*
-  var bucket,key string
+// curl -v -XPOST -d '123456789abcdef' http://localhost:8080/api/v1/obj/mydata
+func PostObjKV(w http.ResponseWriter, r *http.Request, bucket string, key string){
   w.Header().Set("Content-Type", "application/json")
+  /*
+  var bucket,key string  
   if bucket = r.URL.Query().Get("bucket"); bucket == "" {
     log.Printf("postTestKV /api/v1/set bucket error")
     http.Error(w,"{\"status\" : \"bucket error\"}",http.StatusBadRequest)
@@ -54,18 +57,25 @@ func PostTestKV(w http.ResponseWriter, r *http.Request, bucket string, key strin
     log.Printf("postTestKV read error %v",err)
     http.Error(w,"{\"status\" : \"body error\"}",http.StatusBadRequest)
     return
-  }  
+  }
+
+  if key == "" {
+    uuid:=NewUUID()
+    key = uuid.String()
+  }
   if err=UpdKV([]byte(key),[]byte(value),[]byte(bucket)); err!=nil{
     log.Printf("postTestKV update error %v",err)
     http.Error(w,"{\"status\" : \"update error\"}",http.StatusBadRequest)
     return
   }
-  w.WriteHeader(http.StatusOK);w.Write([]byte("{\"status\" : \"ok\"}"))
+  js:=fmt.Sprintf("{\n\"id\":\"%s\",\n\"status\":\"ok\"\n}",key)
+  w.WriteHeader(http.StatusOK);
+  w.Write([]byte(js))
 }
 
 
-// curl -v -XGET 'http://localhost:8080/api/v1/get?bucket=mydata&key=mykey'
-func GetTestKV(w http.ResponseWriter, r *http.Request, bucket string, key string){
+// curl -v -XGET 'http://localhost:8080/api/v1/obj/bucket[/key]'
+func GetObjKV(w http.ResponseWriter, r *http.Request, bucket string, key string){
   /*
   var bucket,key string
   if bucket = r.URL.Query().Get("bucket"); bucket == "" {
@@ -96,3 +106,17 @@ func GetTestKV(w http.ResponseWriter, r *http.Request, bucket string, key string
     w.Write(value) 
 }
 
+
+// curl -v -XDELETE 'http://localhost:8080/api/v1/obj/mydata/mykey'
+func DelObjKV(w http.ResponseWriter, r *http.Request, bucket string, key string){
+  var err error
+  err=DelKV([]byte(key),[]byte(bucket)) 
+  if err != nil {
+    log.Printf("delTestKV /api/v1/get value error %v",err)
+    http.Error(w,"{\"status\" : \"error\"}",http.StatusBadRequest)
+    return
+  } 
+  
+  w.WriteHeader(http.StatusOK)
+  w.Write([]byte("{\n\"status\":\"ok\"\n}"))
+}

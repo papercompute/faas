@@ -8,15 +8,16 @@ import (
   "time"  
   "io/ioutil"
   "encoding/json"
+  "fmt"
 )
 
 
 type userInfo struct {
-  Id uint64 `json:"id"`
-  Created string  `json:"created"` // time.Now().Unix()
+  Id *UUID `json:"id"`
+  Created time.Time  `json:"created"`
+  Updated time.Time  `json:"updated"`
   Email string  `json:"email"`
   PasswordHash string `json:"-"`
-  Status string `json:"status"`
 }
 
 
@@ -28,6 +29,10 @@ func (u *userInfo) gobEncode() ([]byte, error) {
         return nil, err
     }
     err = encoder.Encode(u.Created)
+    if err!=nil {
+        return nil, err
+    }
+    err = encoder.Encode(u.Updated)
     if err!=nil {
         return nil, err
     }
@@ -53,6 +58,10 @@ func (u *userInfo) gobDecode(buf []byte) error {
     if err!=nil {
         return err
     }
+    err = decoder.Decode(&u.Updated)
+    if err!=nil {
+        return err
+    }
     err = decoder.Decode(&u.Email)
     if err!=nil {
         return err
@@ -70,24 +79,8 @@ type userGetReq struct {
   Email string `json:"email"`
 }
 
-type userGetResp struct {
-  Id uint64 `json:"id"`
-  Created string `json:"created"`
-  Email string `json:"email"`
-}
 
-var userIdCounter uint64 = 127 
-
-func getUserId() uint64{
-  uid := userIdCounter
-  userIdCounter = userIdCounter + 1
-  return uid  
-}
-
-
-// curl -v -XPOST -H "Content-Type: application/json" \
-// -d '{"email":"sobaka@drug.com","password":"123456789"}' \
-// 'http://localhost:8080/api/v1/newuser'
+// curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789"}' http://localhost:8080/api/v1/users
 
 func PostNewUser(w http.ResponseWriter, r *http.Request){
   
@@ -132,8 +125,8 @@ func PostNewUser(w http.ResponseWriter, r *http.Request){
   }
 
   user := &userInfo{
-  //  Id:getUserId(),
-    Created: time.Now().Format(time.RFC1123),
+    Id:NewUUID(),
+    Created: time.Now(),//.Format(time.RFC1123),
     Email:userPost.Email,
     PasswordHash:GetMD5Hash(userPost.Password),
   }
@@ -156,6 +149,9 @@ func PostNewUser(w http.ResponseWriter, r *http.Request){
   w.WriteHeader(http.StatusCreated);
   w.Write([]byte("{\"status\" : \"ok\"}"))
 }
+
+
+// curl -v -XGET -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com"}' http://localhost:8080/api/v1/users
 
 func GetUser(w http.ResponseWriter, r *http.Request){
   
@@ -192,7 +188,7 @@ func GetUser(w http.ResponseWriter, r *http.Request){
     http.Error(w,"{\"status\" : \"user decode error\"}",http.StatusBadRequest)
     return
   }
-
+/*
   user.Status = "ok"
   bin, err := json.MarshalIndent(user, "", "  ")
   if err != nil {
@@ -200,10 +196,12 @@ func GetUser(w http.ResponseWriter, r *http.Request){
     http.Error(w,"{\"status\" : \"user json error\"}",http.StatusBadRequest)
     return
   }
-  w.WriteHeader(200);
+  */
+  var js string
+  js=fmt.Sprintf("{\n\"id\":\"%s\",\n\"created\":\"%s\",\n\"email\":\"%s\",\n\"status\":\"ok\"\n}",user.Id,user.Created.Format(time.RFC1123),user.Email)
+  w.WriteHeader(http.StatusOK);
   w.Header().Set("Content-Type", "application/json; charset=utf-8")
-  w.Write(bin)
-  
+  w.Write([]byte(js))  
 }
 
 
