@@ -270,7 +270,7 @@ func main() {
   fmt.Printf("replica: %d\n", cfg.Replica)
   fmt.Printf("cfg: %s,%s\n", cfg.Stora_host,cfg.Web_host)
 
-  faas.InitDB2(db_file_name,[]string{"users","tests"})
+  faas.InitDB2(db_file_name,[]string{"users","tests","usersids"})
   defer faas.FinitDB2()
 
 // server setup
