@@ -56,7 +56,7 @@ func ListenAndServe(host string, public_dir string) error {
     })
 
     if public_dir!=""{
-    	router.NotFound = http.FileServer(http.Dir(public_dir))
+    	router.NotFound = http.FileServer(http.Dir(public_dir)).ServeHTTP
 	  }
 
     return http.ListenAndServe(host, router)
