@@ -1,7 +1,7 @@
 var http = require('http');
 
 
-function postNewUser(email,password){
+function tryToRegisterNewUser(email,password){
 
 var postData = JSON.stringify({
   "email":email,
@@ -11,7 +11,7 @@ var postData = JSON.stringify({
 var options = {
   hostname: 'localhost',
   port: 8000,
-  path: '/api/v1/users',
+  path: '/api/v1/users/register',
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -31,7 +31,8 @@ var req = http.request(options, function(res) {
     console.log('BODY: ' + body);
     if(res.statusCode == 201){
     	js=JSON.parse(body);
-    	getUserInfo(js.id);
+    	//getUserInfo(js.id);
+      console.log(js)
     }
   })
 });
@@ -143,7 +144,8 @@ req.end();
 
 
 // start
+tryToRegisterNewUser("kosmodb@gmail.com","123456789");
 //postNewUser("herome@qwer.com","12312312312312");
-loginUser("herome@qwer.com","12312312312312");
+//loginUser("herome@qwer.com","12312312312312");
 //loginUser("asda@asdasd.com","adj2io3e23b23ek2b3ekj2b3ek2b3ekj23");
 

@@ -1,32 +1,36 @@
 package main
 
 import (
-  "flag"
-  "os"
-	"net/http"
+	"flag"
+	"fmt"
 	"log"
+	"net/http"
+	"os"
 	"runtime"
-  "fmt"
-//"crypto/md5"
-//    "encoding/hex"
-//	"io"
-  "io/ioutil"
-//  "net/url"
-  "encoding/json"
-//  "encoding/gob"
-//  "time"
-//	"regexp"
-//  "bytes"
-//  "runtime"
-//  "github.com/julienschmidt/httprouter"
-  "strings"
-  "./lib"
+	//"crypto/md5"
+	//    "encoding/hex"
+	//	"io"
+	"io/ioutil"
+	//  "net/url"
+	"encoding/json"
+	//  "encoding/gob"
+	//  "time"
+	//	"regexp"
+	//  "bytes"
+	//  "runtime"
+	//  "github.com/julienschmidt/httprouter"
+	"./lib"
+	"strings"
+  //"golang.org/x/crypto/bcrypt"
 )
-
 
 /*
 example data config
-{  
+{
+
+"email" : "kat@kats.com"
+"email_password" : "katsecret"
+
 "hosts" : [
   "127.0.0.1:9000",  "127.0.0.1:8000",
   "127.0.0.1:9001",  "127.0.0.1:8001",
@@ -48,75 +52,69 @@ example data config
 }
 */
 
-type Config struct {
-  // key space (0..2^64)
-  Hosts []string  `json:"hosts"`
-  Replica uint  `json:"replica"`
-  Id uint  `json:"-"`  
-  Stora_host string  `json:"-"`  
-  Web_host string  `json:"-"`  
-  // hosts[(id % len(hosts))*replica]
-}
-
-var cfg Config
-
-type Faas struct {}
-type Storage struct {}
 
 
+type Faas struct{}
+type Storage struct{}
 
 
 func (e *Storage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-  log.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL)
-  http.NotFound(w, r)
+	log.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL)
+	http.NotFound(w, r)
 }
 
 
 func main() {
 
-
-  var cfg_file_name* string = flag.String("cfg", "config.json", "config file")  
-  var db_file_name* string = flag.String("db", "data.db", "db file")  
-  var cfg_id* int = flag.Int("id", 0, "id")  
-
   var err error
-  runtime.GOMAXPROCS(runtime.NumCPU() - 1)
-//  runtime.GOMAXPROCS(1)
 
 
-// read config
-  cfg_file, e := ioutil.ReadFile(*cfg_file_name)
-  if e != nil {
-    fmt.Printf("File error: %v\n", e)
-    os.Exit(1)
-  }
-  fmt.Printf("%s\n", string(cfg_file))
+	var cfg_file_name *string = flag.String("cfg", "config.json", "config file")
+	var db_file_name *string = flag.String("db", "data.db", "db file")
+	var cfg_id *int = flag.Int("id", 0, "id")
 
-  flag.Parse()
+	
+	runtime.GOMAXPROCS(runtime.NumCPU() - 1)
+	//  runtime.GOMAXPROCS(1)
 
-  err = json.Unmarshal(cfg_file, &cfg)
-  if err != nil {
-    fmt.Printf("Cfg file json error: %v\n", err)
-    os.Exit(1)
-  }
-  cfg.Id = uint(*cfg_id)
-  cfg.Stora_host = cfg.Hosts[cfg.Id*2];
-  cfg.Web_host = cfg.Hosts[cfg.Id*2+1];
+	// read config
+	cfg_file, e := ioutil.ReadFile(*cfg_file_name)
+	if e != nil {
+		fmt.Printf("File error: %v\n", e)
+		os.Exit(1)
+	}
+	fmt.Printf("%s\n", string(cfg_file))
 
-  fmt.Printf("id: %d\n", *cfg_id)
-  fmt.Printf("replica: %d\n", cfg.Replica)
-  fmt.Printf("cfg: %s,%s\n", cfg.Stora_host,cfg.Web_host)
+	flag.Parse()
 
-  faas.InitDB2(db_file_name,[]string{"users","tests","usersids"})
-  defer faas.FinitDB2()
+	err = json.Unmarshal(cfg_file, &faas.CFG)
+	if err != nil {
+		fmt.Printf("Cfg file json error: %v\n", err)
+		os.Exit(1)
+	}
+	faas.CFG.Id = uint(*cfg_id)
+	faas.CFG.Stora_host = faas.CFG.Hosts[faas.CFG.Id*2]
+	faas.CFG.Web_host = faas.CFG.Hosts[faas.CFG.Id*2+1]
+  faas.CFG.Url = faas.CFG.Web_host
 
-// server setup
-  finish := make(chan bool)
+	fmt.Printf("id: %d\n", *cfg_id)
+	fmt.Printf("replica: %d\n", faas.CFG.Replica)
+	fmt.Printf("cfg: %s,%s\n", faas.CFG.Stora_host, faas.CFG.Web_host)
 
+	faas.InitDB2(db_file_name, 
+    []string{
+      faas.BucketTests, 
+      faas.BucketUsers, 
+      faas.BucketAwaitEmailConfirmationIds,
+      })
+	defer faas.FinitDB2()
+
+
+	finish := make(chan bool)
 
   go func() {
-    log.Println("http.ListenAndServe Stora_host "+cfg.Stora_host);
-    h:=strings.Split(cfg.Stora_host, ":")  
+    log.Println("http.ListenAndServe Stora_host "+faas.CFG.Stora_host);
+    h:=strings.Split(faas.CFG.Stora_host, ":")  
     err:=http.ListenAndServe(":"+h[1], &Storage{})
     if err != nil {
       log.Fatal("ListenAndServe: Stora_host ", err)
@@ -124,13 +122,13 @@ func main() {
   }()
 
   go func() {    
-    log.Println("http.ListenAndServe Web_host "+cfg.Web_host);    
-    h:=strings.Split(cfg.Web_host, ":")
+    log.Println("http.ListenAndServe Web_host "+faas.CFG.Web_host);    
+    h:=strings.Split(faas.CFG.Web_host, ":")
     err:=faas.ListenAndServe(":"+h[1],"public")
     if err != nil {
       log.Fatal("ListenAndServe: Web_host ", err)
     }
   }()
 
-  <-finish
+	<-finish
 }

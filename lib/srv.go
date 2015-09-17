@@ -14,7 +14,10 @@ import (
 )
 
 func ListenAndServe(host string, public_dir string) error {
+
     router := httprouter.New()
+
+    // objects
 
     // curl -v -XPOST -d '123456789abcdef!' 'http://localhost:8080/api/v1/obj/mydata'
     router.POST("/api/v1/obj/:bucket", func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
@@ -37,26 +40,47 @@ func ListenAndServe(host string, public_dir string) error {
       DelObjKV(w,r,ps.ByName("bucket"),ps.ByName("key"))
     })
 
+
+    // users
+
+    // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789"}' http://localhost:8080/api/v1/users/register
+    router.POST("/api/v1/users/register",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      RegisterNewUser(w,r)
+    })
+    // curl -v -XGET  http://localhost:8080/api/v1/users/confirm/email/3bea3a7ba0814591852016fdc8c3ecce
+    router.GET("/api/v1/users/confirm/email/:userid",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      ConfirmUserEmail(w,r,ps.ByName("userid"))
+    })
+    // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com"}' http://localhost:8080/api/v1/users/resend/confirm/email
+    router.POST("/api/v1/users/resend/confirm/email",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      ResendConfirmUserEmail(w,r)
+    })
     // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789"}' http://localhost:8080/api/v1/users/login
     router.POST("/api/v1/users/login",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
       LoginUser(w,r)
     })
-    // curl -v -XPOST -H "Content-Type: application/json" -d '{"token":"4550aa3ef1584a649a6dcc6a151762cb"}' http://localhost:8080/api/v1/users/logout
-    router.POST("/api/v1/users/logout",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
-      LogoutUser(w,r)
+    // curl -v -XGET -H "Content-Type: application/json" -H "X-Auth-Token: 213ba332342234234920349282882822" http://localhost:8080/api/v1/users/info
+    router.GET("/api/v1/users/info",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      GetUserInfo(w,r)
+    })
+    // curl -v -XGET -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com"}' http://localhost:8080/api/v1/users/password/resetToken
+    router.GET("/api/v1/users/password/resetToken",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      SendPasswordResetTokenToUserEmail(w,r)
+    })
+    // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789"}' 
+    // http://localhost:8080/api/v1/users/password/reset/3bea3a7ba0814591852016fdc8c3ecce
+    router.POST("/api/v1/users/password/reset/:token",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      ResetUserPasswordWithNewOneByToken(w,r,ps.ByName("token"))
+    })
+    // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","oldpassword":"123456789","newpassword":"123456789"}' 
+    // http://localhost:8080/api/v1/users/password/change
+    router.POST("/api/v1/users/password/change",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      ChangeUserPassword(w,r)
     })
 
-    // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789"}' http://localhost:8080/api/v1/users
-    router.POST("/api/v1/users",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
-      PostNewUser(w,r)
-    })
-    // curl -v -XGET -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com"}' http://localhost:8080/api/v1/users'
-    router.GET("/api/v1/users",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
-      GetUser(w,r)
-    })
 
     if public_dir!=""{
-    	router.NotFound = http.FileServer(http.Dir(public_dir)).ServeHTTP
+    	router.NotFound = http.FileServer(http.Dir(public_dir))
 	  }
 
     return http.ListenAndServe(host, router)

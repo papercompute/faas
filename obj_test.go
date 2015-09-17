@@ -28,7 +28,7 @@ func TestObjects(t *testing.T) {
 */
   var url = "http://127.0.0.1:8000"
 
-  var data string = "1234567890abcdef!@#$%^&*()_+"
+  var data string = `1234567890abcdef!@#$%^&*()_+`
 
   // create object
 
@@ -111,9 +111,9 @@ func TestObjects(t *testing.T) {
   }
 
 
-  jsmap1:=map[string]string{}
+  jsmap:=map[string]string{}
 
-  if err = json.Unmarshal(content, &jsmap1); err != nil {
+  if err = json.Unmarshal(content, &jsmap); err != nil {
   	t.Fatal(err)
   }
 
@@ -121,7 +121,7 @@ func TestObjects(t *testing.T) {
   	t.Fatal(err)
   }
   
-  t.Log(jsmap1["status"])
+  t.Log(jsmap["status"])
 
 
 }
