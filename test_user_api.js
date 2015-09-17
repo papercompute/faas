@@ -125,7 +125,7 @@ var req = http.request(options, function(res) {
     	//getUserInfo(js.id);
     	console.log("token:",js.token);
 
-    	getUserInfo(js.id,js.token);
+    	//getUserInfo(js.id,js.token);
     }
   })
 });
@@ -144,7 +144,8 @@ req.end();
 
 
 // start
-tryToRegisterNewUser("kosmodb@gmail.com","123456789");
+//tryToRegisterNewUser("kosmodb@gmail.com","123456789");
+loginUser("kosmodb@gmail.com","123456789");
 //postNewUser("herome@qwer.com","12312312312312");
 //loginUser("herome@qwer.com","12312312312312");
 //loginUser("asda@asdasd.com","adj2io3e23b23ek2b3ekj2b3ek2b3ekj23");

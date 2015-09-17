@@ -94,27 +94,12 @@ func RegisterNewUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	userPost := newUserPostReq{}
-	err := ReadJSON(r,userPost)
+	err := ReadJSON(r,&userPost)
 	if err!=nil{
 		log.Printf("RegisterNewUser  ReadJSON error %v", err)
 		http.Error(w, "{\"status\" : \"bad reguest\"}", http.StatusBadRequest)
 		return
 	}
-
-/*	
-	var content []byte
-	if content, err = ioutil.ReadAll(r.Body); err != nil {
-		log.Printf("RegisterNewUser ioutil.ReadAll error: %v", err)
-		http.Error(w, "{\"status\" : \"request data error\"}", http.StatusBadRequest)
-		return
-	}
-
-	if err = json.Unmarshal(content, &userPost); err != nil {
-		log.Printf("RegisterNewUser json.Unmarshal error: %v %s", err, string(content))
-		http.Error(w, "{\"status\" : \"request json error\"}", http.StatusBadRequest)
-		return
-	}
-*/	
 
 	if len(userPost.Email) < 4 { // a@a.co
 		log.Printf("RegisterNewUser email error")
@@ -170,14 +155,6 @@ func RegisterNewUser(w http.ResponseWriter, r *http.Request) {
 	  SendMail(user.Email,"registration confirmation link","Follow this link "+CFG.Url+"/api/v1/users/confirm/email/"+emailConfirmationId)
 	}()		
 	
-/*
-	err = SendMail(user.Email,"registration confirmation link","Follow this link "+CFG.Url+"/api/v1/users/confirm/"+emailConfirmationId)
-	if err != nil {
-		log.Printf("RegisterNewUser sendmail %s error %v", user.Email, err)
-		http.Error(w, "{\"status\" : \"sendmail error\"}", http.StatusInternalServerError)
-		return
-	}
-*/
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(fmt.Sprintf("{\n\"id\":\"%s\",\n\"status\":\"ok\"\n}", user.Id)))
 }
@@ -238,26 +215,13 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	loginPost := loginPostReq{}
-	err := ReadJSON(r,loginPost)
+	err := ReadJSON(r,&loginPost)
 	if err!=nil{
 		log.Printf("LoginUser  ReadJSON error %v", err)
 		http.Error(w, "{\"status\" : \"bad reguest\"}", http.StatusBadRequest)
 		return
 	}
 
-/*	
-	var content []byte
-	if content, err = ioutil.ReadAll(r.Body); err != nil {
-		log.Printf("LoginUser ioutil.ReadAll error: %v", err)
-		http.Error(w, "{\"status\" : \"request data error\"}", http.StatusBadRequest)
-		return
-	}
-	if err = json.Unmarshal(content, &loginPost); err != nil {
-		log.Printf("LoginUser json.Unmarshal error: %v %s", err, string(content))
-		http.Error(w, "{\"status\" : \"request json error\"}", http.StatusBadRequest)
-		return
-	}
-*/	
 
 	if len(loginPost.Email) < 4 { // a@a.co
 		log.Printf("LoginUser email error")
@@ -382,7 +346,7 @@ func SendPasswordResetTokenToUserEmail(w http.ResponseWriter, r *http.Request) {
 	var err error
 	passResetPost := passResetPostReq{}
 
-	if err = ReadJSON(r,passResetPost); err!=nil{
+	if err = ReadJSON(r,&passResetPost); err!=nil{
 		log.Printf("SendPasswordResetTokenToUserEmail  ReadJSON error %v", err)
 		http.Error(w, "{\"status\" : \"bad reguest\"}", http.StatusBadRequest)
 		return
