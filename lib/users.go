@@ -3,14 +3,15 @@ package faas
 import (
 	"bytes"
 	"encoding/gob"
-	"encoding/json"
+//	"encoding/json"
 //	"encoding/binary"
 	"fmt"
-	"io/ioutil"
+//	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
 	"errors"
+	"strings"
 )
 
 var (
@@ -93,8 +94,8 @@ func RegisterNewUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	userPost := newUserPostReq{}
-
-	if err := ReadJSON(r,userPost); err!=nil{
+	err := ReadJSON(r,userPost)
+	if err!=nil{
 		log.Printf("RegisterNewUser  ReadJSON error %v", err)
 		http.Error(w, "{\"status\" : \"bad reguest\"}", http.StatusBadRequest)
 		return
@@ -237,8 +238,8 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	loginPost := loginPostReq{}
-
-	if err := ReadJSON(r,loginPost); err!=nil{
+	err := ReadJSON(r,loginPost)
+	if err!=nil{
 		log.Printf("LoginUser  ReadJSON error %v", err)
 		http.Error(w, "{\"status\" : \"bad reguest\"}", http.StatusBadRequest)
 		return
