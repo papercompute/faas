@@ -47,7 +47,6 @@ func (u *userInfo) gobDecode(buf []byte) error {
 	return decoder.Decode(u)
 }
 
-
 func getUserInfoFromDB(email string) (error, *userInfo){
 	err, res := GetKV([]byte(email), []byte(BucketUsers))
 	if err != nil {
@@ -80,6 +79,102 @@ func setUserInfoToDB(u *userInfo) (error){
 
 	return nil
 }
+
+
+
+
+func gobEncodeI(v interface{})([]byte, error) {
+	w := new(bytes.Buffer)
+	encoder := gob.NewEncoder(w)
+	err := encoder.Encode(v)
+	if err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
+func gobDecodeI(buf []byte, v interface{}) error {
+	r := bytes.NewBuffer(buf)
+	decoder := gob.NewDecoder(r)
+	return decoder.Decode(v)
+}
+
+func getIFromDB(key []byte, v interface{}, bucket []byte ) (error){
+	err, res := GetKV(key, bucket)
+	if err != nil {
+		return err
+	}
+	if res == nil {
+		return errors.New("Error getIFromDB empty key")
+	}
+
+	err = gobDecodeI(res, v)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func setIToDB(key []byte, v interface{}, bucket []byte) (error){
+
+	encoded, err := gobEncodeI(v)
+	if err != nil {
+		return err
+	}
+
+	err = UpdKV(key, encoded, bucket)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type testInfo struct{
+	Name string
+	Created time.Time
+	Tested bool
+	Id string
+	Number int64
+}
+
+func TestIDB() error {
+
+	ti:=&testInfo{
+		Name:"Begemot",
+		Created:time.Now(),
+		Tested:true,
+		Id:NewUUID(),
+		Number:1235172376152376152,
+	}
+
+	err:=setIToDB([]byte("hero1"),&ti,[]byte(BucketTests))
+	if err!=nil{
+		return err
+	}
+
+	ti2:=&testInfo{}
+	err=getIFromDB([]byte("hero1"),&ti2,[]byte(BucketTests))
+	if err!=nil{
+		return err
+	}
+
+	log.Printf("%v",ti)
+	log.Printf("%v",ti2)
+
+
+	if ti.Name != ti2.Name{
+		return errors.New(fmt.Sprintf("incorrect Name %s,%s",ti.Name,ti2.Name))	
+	}
+	if ti.Created != ti2.Created{
+		return errors.New(fmt.Sprintf("incorrect Created %v,%v",ti.Name,ti2.Name))	
+	}
+	return nil
+	
+}
+
+
 
 
 type newUserPostReq struct {
@@ -325,8 +420,52 @@ func ConfirmUserEmail(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 
+// curl -v -XPOST -H "Content-Type: application/json" 
+// -d '{"email":"sobaka@drug.com","password":"123456789"}' 
+// http://localhost:8080/api/v1/users/resend/confirm/email
 func ResendConfirmUserEmail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
+	loginPost := loginPostReq{}
+	err := ReadJSON(r,&loginPost)
+	if err!=nil{
+		log.Printf("ResendConfirmUserEmail  ReadJSON error %v", err)
+		http.Error(w, "{\"status\" : \"bad reguest\"}", http.StatusBadRequest)
+		return
+	}
+	var user *userInfo
+	err,user = getUserInfoFromDB(loginPost.Email)
+	if err != nil {
+		log.Printf("ResendConfirmUserEmail user %s not found", loginPost.Email)
+		http.Error(w, "{\"status\" : \"not found\"}", http.StatusNotFound)
+		return
+	}
+
+	if err=CompareBcryptHashAndPassword(user.PasswordHash, loginPost.Password); err!=nil{
+		log.Printf("ResendConfirmUserEmail wrong password")
+		http.Error(w, "{\"status\" : \"wrong password\"}", http.StatusBadRequest)
+		return
+	}
+
+	if user.Confirmed != zeroTime {
+		log.Printf("ResendConfirmUserEmail email not confirmed")
+		http.Error(w, "{\"status\" : \"user has already confirmed email\"}", http.StatusBadRequest)
+		return		
+	}
+	
+	emailConfirmationId:=NewUUID()
+
+	err = UpdKV([]byte(emailConfirmationId), []byte(user.Email+":"+string(time.Now().Unix())), []byte(BucketAwaitEmailConfirmationIds))
+	if err != nil {
+		log.Printf("ResendConfirmUserEmail UpdKV %s : %s error %v", user.Email, emailConfirmationId, err)
+		http.Error(w, "{\"status\" : \"email confirmation id management error\"}", http.StatusInternalServerError)
+		return
+	}
+
+	go func () {
+	  SendMail(user.Email,"registration confirmation link",
+	  	"Follow this link "+CFG.Url+"/api/v1/users/confirm/email/"+emailConfirmationId)
+	}()		
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("{\n\"status\":\"ok\"\n}"))	
@@ -352,14 +491,34 @@ func SendPasswordResetTokenToUserEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	passwordResetToken:=NewUUID()
+
+
+	err = UpdKV([]byte(passwordResetToken), 
+		[]byte(passResetPost.Email+":"+string(time.Now().Unix())), 
+		[]byte(BucketPasswordResetIds))
+	if err != nil {
+		log.Printf("SendPasswordResetTokenToUserEmail UpdKV %s : %s error %v", 
+			passResetPost.Email, passwordResetToken, err)
+		http.Error(w, "{\"status\" : \"email confirmation id management error\"}", http.StatusInternalServerError)
+		return
+	}
+
+	go func () {
+	  SendMail(passResetPost.Email,"password reset token",
+	  	"Copy this token to password reset form "+passwordResetToken)
+	}()		
+
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("{\n\"status\":\"ok\"\n}"))
 }
 
 // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789"}' 
-// http://localhost:8080/api/v1/users/password/reset/3bea3a7ba0814591852016fdc8c3ecce
+// http://localhost:8080/api/v1/users/password/reset/:token
 func ResetUserPasswordWithNewOneByToken(w http.ResponseWriter, r *http.Request, token string) {
 	w.Header().Set("Content-Type", "application/json")
+
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("{\n\"status\":\"ok\"\n}"))

@@ -106,8 +106,15 @@ func main() {
       faas.BucketTests, 
       faas.BucketUsers, 
       faas.BucketAwaitEmailConfirmationIds,
+      faas.BucketPasswordResetIds,
       })
 	defer faas.FinitDB2()
+
+
+    
+    err=faas.TestIDB()
+
+	log.Fatal("Hipster! %v",err)
 
 
 	finish := make(chan bool)

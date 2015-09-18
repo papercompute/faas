@@ -56,7 +56,7 @@ var getData = JSON.stringify({
 var options = {
   hostname: 'localhost',
   port: 8000,
-  path: '/api/v1/users',
+  path: '/api/v1/users/info',
   method: 'GET',
   headers: {
     'Content-Type': 'application/json',

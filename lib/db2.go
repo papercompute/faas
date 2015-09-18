@@ -12,6 +12,7 @@ const (
   BucketTests = "tests"
   BucketUsers = "users"
   BucketAwaitEmailConfirmationIds = "await_email_confirmation_ids"
+  BucketPasswordResetIds = "password_reset_ids"
 
 )
 
