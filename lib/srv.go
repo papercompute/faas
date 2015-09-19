@@ -53,24 +53,28 @@ func ListenAndServe(host string, public_dir string) error {
     })
     // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com"}' http://localhost:8080/api/v1/users/resend/confirm/email
     router.POST("/api/v1/users/resend/confirm/email",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
-      ResendConfirmUserEmail(w,r)
+      ResendUserConfirmationEmail(w,r)
     })
     // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789"}' http://localhost:8080/api/v1/users/login
     router.POST("/api/v1/users/login",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
       LoginUser(w,r)
     })
+    // curl -v -XGET -H "X-Auth-Token: 213ba332342234234920349282882822" http://localhost:8080/api/v1/users/refresh
+    router.GET("/api/v1/users/refresh",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      RefreshUserToken(w,r)
+    })
     // curl -v -XGET -H "Content-Type: application/json" -H "X-Auth-Token: 213ba332342234234920349282882822" http://localhost:8080/api/v1/users/info
     router.GET("/api/v1/users/info",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
       GetUserInfo(w,r)
     })
-    // curl -v -XGET -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com"}' http://localhost:8080/api/v1/users/password/resetToken
-    router.GET("/api/v1/users/password/resetToken",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+    // curl -v -XGET -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com"}' http://localhost:8080/api/v1/users/password/reset/token
+    router.GET("/api/v1/users/password/reset/token",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
       SendPasswordResetTokenToUserEmail(w,r)
     })
-    // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789"}' 
-    // http://localhost:8080/api/v1/users/password/reset/3bea3a7ba0814591852016fdc8c3ecce
-    router.POST("/api/v1/users/password/reset/:token",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
-      ResetUserPasswordWithNewOneByToken(w,r,ps.ByName("token"))
+    // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789","token":"3bea3a7ba0814591852016fdc8c3ecce"}' 
+    // http://localhost:8080/api/v1/users/password/reset
+    router.POST("/api/v1/users/password/reset",  func (w http.ResponseWriter, r *http.Request, ps httprouter.Params){
+      ResetUserPasswordWithNewOneByToken(w,r)
     })
     // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","oldpassword":"123456789","newpassword":"123456789"}' 
     // http://localhost:8080/api/v1/users/password/change

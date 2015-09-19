@@ -112,9 +112,8 @@ func main() {
 
 
     
-    err=faas.TestIDB()
-
-	log.Fatal("Hipster! %v",err)
+//  err=faas.TestIDB()
+//	log.Fatal("Hipster!",err)
 
 
 	finish := make(chan bool)

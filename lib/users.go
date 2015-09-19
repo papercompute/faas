@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 	"errors"
-	"strings"
+//	"strings"
 )
 
 var (
@@ -137,6 +137,7 @@ type testInfo struct{
 	Tested bool
 	Id string
 	Number int64
+	Arr []byte
 }
 
 func TestIDB() error {
@@ -147,6 +148,7 @@ func TestIDB() error {
 		Tested:true,
 		Id:NewUUID(),
 		Number:1235172376152376152,
+		Arr:[]byte("Hero never give up"),
 	}
 
 	err:=setIToDB([]byte("hero1"),&ti,[]byte(BucketTests))
@@ -168,7 +170,21 @@ func TestIDB() error {
 		return errors.New(fmt.Sprintf("incorrect Name %s,%s",ti.Name,ti2.Name))	
 	}
 	if ti.Created != ti2.Created{
-		return errors.New(fmt.Sprintf("incorrect Created %v,%v",ti.Name,ti2.Name))	
+		return errors.New(fmt.Sprintf("incorrect Created %v,%v",ti.Created,ti2.Created))	
+	}
+	if ti.Tested != ti2.Tested{
+		return errors.New(fmt.Sprintf("incorrect Tested %v,%v",ti.Tested,ti2.Tested))	
+	}
+	if ti.Id != ti2.Id{
+		return errors.New(fmt.Sprintf("incorrect Id %v,%v",ti.Id,ti2.Id))	
+	}
+	if ti.Number != ti2.Number{
+		return errors.New(fmt.Sprintf("incorrect Number %v,%v",ti.Number,ti2.Number))	
+	}
+	for i,_:=range ti.Arr{ 
+	  if ti.Arr[i] != ti2.Arr[i]{
+		return errors.New(fmt.Sprintf("incorrect Arr %d, %v,%v",i,ti.Arr[i],ti2.Arr[i]))	
+	  }
 	}
 	return nil
 	
@@ -237,14 +253,21 @@ func RegisterNewUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	emailConfirmationId:=NewUUID()
 
-	err = UpdKV([]byte(emailConfirmationId), []byte(user.Email+":"+string(time.Now().Unix())), []byte(BucketAwaitEmailConfirmationIds))
+
+	emailConfirmationId:=NewUUID()
+	rec:=confirmUserEmailRec{
+		Email:user.Email,
+		Created:time.Now(),
+	}
+
+	err = setIToDB([]byte(emailConfirmationId),&rec,[]byte(BucketAwaitEmailConfirmationIds))
 	if err != nil {
-		log.Printf("RegisterNewUser UpdKV %s : %s error %v", user.Email, emailConfirmationId, err)
-		http.Error(w, "{\"status\" : \"email confirmation id management error\"}", http.StatusInternalServerError)
+		log.Printf("RegisterNewUser setIToDB %s : %s error %v", user.Email, emailConfirmationId, err)
+		http.Error(w, "{\"status\" : \"internal server error\"}", http.StatusInternalServerError)
 		return
 	}
+
 
 	go func () {
 	  SendMail(user.Email,"registration confirmation link","Follow this link "+CFG.Url+"/api/v1/users/confirm/email/"+emailConfirmationId)
@@ -259,7 +282,8 @@ type userGetReq struct {
 	Email string `json:"email"`
 }
 
-// curl -v -XGET -H "Content-Type: application/json" -H "X-Auth-Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Imtvc21vZGJAZ21haWwuY29tIiwiZXhwIjoxNDQyNDMyNjQxfQ.nqcAjw8C0MKLPyqlmhuMIhS1bN7Z75aOzOUBqomXxRI" 
+// curl -v -XGET -H "Content-Type: application/json" 
+// -H "X-Auth-Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Imtvc21vZGJAZ21haWwuY29tIiwiZXhwIjoxNDQyNDMyNjQxfQ.nqcAjw8C0MKLPyqlmhuMIhS1bN7Z75aOzOUBqomXxRI" 
 // http://localhost:8080/api/v1/users/info
 func GetUserInfo(w http.ResponseWriter, r *http.Request) {
 
@@ -275,7 +299,7 @@ func GetUserInfo(w http.ResponseWriter, r *http.Request) {
 	email, err:= CheckAuthToken(authToken)
 	if err != nil {
 		log.Printf("GetUser check X-Auth-Token error %v", err)
-		http.Error(w, "{\"status\" : \"check token error\"}", http.StatusBadRequest)
+		http.Error(w, "{\"status\" : \"invalid token\"}", http.StatusBadRequest)
 		return
 	}
 
@@ -289,7 +313,7 @@ func GetUserInfo(w http.ResponseWriter, r *http.Request) {
 
 	if user.Confirmed == zeroTime {
 		log.Printf("GetUser email not confirmed")
-		http.Error(w, "{\"status\" : \"user not confirmed email\"}", http.StatusBadRequest)
+		http.Error(w, "{\"status\" : \"user email is not confirmed\"}", http.StatusBadRequest)
 		return		
 	}
 
@@ -343,7 +367,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		return		
 	}
 	
-	log.Printf("user %v",user)
+	//log.Printf("user %v",user)
 
 	if err=CompareBcryptHashAndPassword(user.PasswordHash, loginPost.Password); err!=nil{
 		log.Printf("LoginUser wrong password")
@@ -363,35 +387,81 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 }
 
 
+// curl -v -XGET -H "X-Auth-Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Imtvc21vZGJAZ21haWwuY29tIiwiZXhwIjoxNDQyNDMyNjQxfQ.nqcAjw8C0MKLPyqlmhuMIhS1bN7Z75aOzOUBqomXxRI" 
+// http://localhost:8080/api/v1/users/refresh
+func RefreshUserToken(w http.ResponseWriter, r *http.Request) {
 
-// curl -v -XPOST http://localhost:8080/api/v1/users/confirm/:userid
+	w.Header().Set("Content-Type", "application/json")
+
+	authToken := r.Header.Get("X-Auth-Token")
+	if authToken == "" {
+		log.Printf("RefreshUserToken X-Auth-Token error")
+		http.Error(w, "{\"status\" : \"token error\"}", http.StatusBadRequest)
+		return
+	}
+
+	email, err:= CheckAuthToken(authToken)
+	if err != nil {
+		log.Printf("RefreshUserToken check X-Auth-Token error %v", err)
+		http.Error(w, "{\"status\" : \"invalid token\"}", http.StatusBadRequest)
+		return
+	}
+
+	var user *userInfo
+	err,user = getUserInfoFromDB(email)
+	if err != nil {
+		log.Printf("RefreshUserToken user %s not found", email)
+		http.Error(w, "{\"status\" : \"user not found\"}", http.StatusNotFound)
+		return
+	}
+
+	if user.Confirmed == zeroTime {
+		log.Printf("RefreshUserToken email not confirmed")
+		http.Error(w, "{\"status\" : \"user email is not confirmed\"}", http.StatusBadRequest)
+		return		
+	}
+
+	token, err := GetAuthToken(user)
+	if err != nil {
+		log.Printf("LoginUser GetAuthToken error %v", err)
+		http.Error(w, "{\"status\" : \"user decode error\"}", http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf("{\n\"token\":\"%s\",\n\"status\":\"ok\"\n}", token)))
+}
+
+
+
+
+type confirmUserEmailRec struct{
+	Email string
+	Created time.Time
+}
+
+
+// curl -v -XPOST http://localhost:8080/api/v1/users/confirm/:id
 func ConfirmUserEmail(w http.ResponseWriter, r *http.Request, id string) {
+
+	var err error
 
 	w.Header().Set("Content-Type", "application/json")
 
 	bucket:=[]byte(BucketAwaitEmailConfirmationIds)
-	
-	err, res := GetKV([]byte(id), bucket)
+
+
+	rec:=confirmUserEmailRec{}
+
+	err = getIFromDB([]byte(id),&rec,bucket)
 	if err != nil {
-		log.Printf("ConfirmUserEmail GetKV error %v", err)
-		http.Error(w, "{\"status\" : \"get id error\"}", http.StatusBadRequest)
-		return
-	}
-	if res == nil {
-		log.Printf("ConfirmUserEmail confirm email id %s not found", id)
-		http.Error(w, "{\"status\" : \"id not found\"}", http.StatusNotFound)
+		log.Printf("ConfirmUserEmail getIFromDB %s error %v", id, err)
+		http.Error(w, "{\"status\" : \"internal server error\"}", http.StatusBadRequest)
 		return
 	}
 
-	d:=strings.Split(string(res),":")
-	email:=d[0]
-/*
-	if t0, err := strconv.ParseInt(d[1], 10, 64); err != nil {
-		log.Printf("ConfirmUserEmail bad data")
-		http.Error(w, "{\"status\" : \"bad data\"}", http.StatusBadRequest)
-		return
-	}	
-*/
+	email:=rec.Email
+
 	var user *userInfo
 	err,user = getUserInfoFromDB(email)
 	if err != nil {
@@ -423,7 +493,7 @@ func ConfirmUserEmail(w http.ResponseWriter, r *http.Request, id string) {
 // curl -v -XPOST -H "Content-Type: application/json" 
 // -d '{"email":"sobaka@drug.com","password":"123456789"}' 
 // http://localhost:8080/api/v1/users/resend/confirm/email
-func ResendConfirmUserEmail(w http.ResponseWriter, r *http.Request) {
+func ResendUserConfirmationEmail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	loginPost := loginPostReq{}
@@ -448,17 +518,21 @@ func ResendConfirmUserEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user.Confirmed != zeroTime {
-		log.Printf("ResendConfirmUserEmail email not confirmed")
-		http.Error(w, "{\"status\" : \"user has already confirmed email\"}", http.StatusBadRequest)
+		log.Printf("ResendConfirmUserEmail user email has already confirmed %v",user.Confirmed)
+		http.Error(w, "{\"status\" : \"user email has already confirmed\"}", http.StatusBadRequest)
 		return		
 	}
 	
 	emailConfirmationId:=NewUUID()
+	rec:=confirmUserEmailRec{
+		Email:user.Email,
+		Created:time.Now(),
+	}
 
-	err = UpdKV([]byte(emailConfirmationId), []byte(user.Email+":"+string(time.Now().Unix())), []byte(BucketAwaitEmailConfirmationIds))
+	err = setIToDB([]byte(emailConfirmationId),&rec,[]byte(BucketAwaitEmailConfirmationIds))
 	if err != nil {
-		log.Printf("ResendConfirmUserEmail UpdKV %s : %s error %v", user.Email, emailConfirmationId, err)
-		http.Error(w, "{\"status\" : \"email confirmation id management error\"}", http.StatusInternalServerError)
+		log.Printf("ResendConfirmUserEmail setIToDB %s : %s error %v", user.Email, emailConfirmationId, err)
+		http.Error(w, "{\"status\" : \"internal server error\"}", http.StatusInternalServerError)
 		return
 	}
 
@@ -474,18 +548,26 @@ func ResendConfirmUserEmail(w http.ResponseWriter, r *http.Request) {
 
 
 
-type passResetPostReq struct {
+type passResetGetReq struct {
 	Email    string `json:"email"`
+}
+
+
+type passResetTokenRec struct{
+	Email string
+	Created time.Time
 }
 
 // curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com"}' 
 // http://localhost:8080/api/v1/users/password/sendResetToken
 func SendPasswordResetTokenToUserEmail(w http.ResponseWriter, r *http.Request) {	
 	w.Header().Set("Content-Type", "application/json")
-	var err error
-	passResetPost := passResetPostReq{}
 
-	if err = ReadJSON(r,&passResetPost); err!=nil{
+	var err error
+
+	passResetGet := passResetGetReq{}
+
+	if err = ReadJSON(r,&passResetGet); err!=nil{
 		log.Printf("SendPasswordResetTokenToUserEmail  ReadJSON error %v", err)
 		http.Error(w, "{\"status\" : \"bad reguest\"}", http.StatusBadRequest)
 		return
@@ -493,19 +575,20 @@ func SendPasswordResetTokenToUserEmail(w http.ResponseWriter, r *http.Request) {
 
 	passwordResetToken:=NewUUID()
 
+	rec:=passResetTokenRec{
+		Email:passResetGet.Email,
+		Created:time.Now(),
+	}
 
-	err = UpdKV([]byte(passwordResetToken), 
-		[]byte(passResetPost.Email+":"+string(time.Now().Unix())), 
-		[]byte(BucketPasswordResetIds))
+	err = setIToDB([]byte(passwordResetToken),&rec,[]byte(BucketPasswordResetIds))
 	if err != nil {
-		log.Printf("SendPasswordResetTokenToUserEmail UpdKV %s : %s error %v", 
-			passResetPost.Email, passwordResetToken, err)
-		http.Error(w, "{\"status\" : \"email confirmation id management error\"}", http.StatusInternalServerError)
+		log.Printf("SendPasswordResetTokenToUserEmail setIToDB %s error %v", passwordResetToken, err)
+		http.Error(w, "{\"status\" : \"internal server error\"}", http.StatusInternalServerError)
 		return
 	}
 
 	go func () {
-	  SendMail(passResetPost.Email,"password reset token",
+	  SendMail(passResetGet.Email,"password reset token",
 	  	"Copy this token to password reset form "+passwordResetToken)
 	}()		
 
@@ -514,11 +597,76 @@ func SendPasswordResetTokenToUserEmail(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("{\n\"status\":\"ok\"\n}"))
 }
 
-// curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789"}' 
-// http://localhost:8080/api/v1/users/password/reset/:token
-func ResetUserPasswordWithNewOneByToken(w http.ResponseWriter, r *http.Request, token string) {
+
+type passResetByTokenPostReq struct {
+	Email    string `json:"email"`
+	Password    string `json:"password"`
+	Token    string `json:"token"`
+}
+
+
+// curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","password":"123456789","token":"12312312312312"}' 
+// http://localhost:8080/api/v1/users/password/reset
+func ResetUserPasswordWithNewOneByToken(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	passPost := passResetByTokenPostReq{}
+	err := ReadJSON(r,&passPost)
+	if err!=nil{
+		log.Printf("ResetUserPasswordWithNewOneByToken  ReadJSON error %v", err)
+		http.Error(w, "{\"status\" : \"bad reguest\"}", http.StatusBadRequest)
+		return
+	}
+
+	if len(passPost.Email) < 4 { // a@a.co
+		log.Printf("ResetUserPasswordWithNewOneByToken email error")
+		http.Error(w, "{\"status\" : \"email too short\"}", http.StatusBadRequest)
+		return
+	}
+	if len(passPost.Password) < 4 { // a@a.co
+		log.Printf("ResetUserPasswordWithNewOneByToken password error")
+		http.Error(w, "{\"status\" : \"password too short\"}", http.StatusBadRequest)
+		return
+	}
+
+	rec:=passResetTokenRec{}
+
+	err = getIFromDB([]byte(passPost.Token),&rec,[]byte(BucketPasswordResetIds))
+	if err != nil {
+		log.Printf("ResetUserPasswordWithNewOneByToken getIFromDB %s error %v", passPost.Token, err)
+		http.Error(w, "{\"status\" : \"internal server error\"}", http.StatusInternalServerError)
+		return
+	}
+
+	if rec.Email!=passPost.Email{
+		log.Printf("ResetUserPasswordWithNewOneByToken wrong email %s error %s : %s", passPost.Token, rec.Email, passPost.Email)
+		http.Error(w, "{\"status\" : \"wrong email\"}", http.StatusBadRequest)
+		return
+	}
+
+	var user *userInfo
+	err,user = getUserInfoFromDB(passPost.Email)
+	if err != nil {
+		log.Printf("ResetUserPasswordWithNewOneByToken user %s not found", passPost.Email)
+		http.Error(w, "{\"status\" : \"not found\"}", http.StatusNotFound)
+		return
+	}
+
+
+	if user.Confirmed == zeroTime {
+		log.Printf("ResetUserPasswordWithNewOneByToken email not confirmed")
+		http.Error(w, "{\"status\" : \"user not confirmed email\"}", http.StatusBadRequest)
+		return		
+	}	
+
+	user.PasswordHash = GetBcryptHash(passPost.Password)
+
+	err = setUserInfoToDB(user)
+	if err != nil {
+		log.Printf("ResetUserPasswordWithNewOneByToken setUserInfoToDB error %v", err)
+		http.Error(w, "{\"status\" : \"set user error\"}", http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("{\n\"status\":\"ok\"\n}"))
@@ -530,9 +678,59 @@ type changePassPostReq struct {
 	NewPassword string `json:"newpassword"`
 }
 
+
+// curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"sobaka@drug.com","oldpassword":"123456789","newpassword":"123456789"}'
+// http://localhost:8080/api/v1/users/password/change 
 func ChangeUserPassword(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	var err error
+	changePassPost := changePassPostReq{}
+
+	if err = ReadJSON(r,&changePassPost); err!=nil{
+		log.Printf("ChangeUserPassword  json error %v", err)
+		http.Error(w, "{\"status\" : \"bad reguest\"}", http.StatusBadRequest)
+		return
+	}
+
+	if len(changePassPost.NewPassword) < 4 { // a@a.co
+		log.Printf("ChangeUserPassword password error")
+		http.Error(w, "{\"status\" : \"password too short\"}", http.StatusBadRequest)
+		return
+	}
+
+
+	var user *userInfo
+	err,user = getUserInfoFromDB(changePassPost.Email)
+	if err != nil {
+		log.Printf("ChangeUserPassword user %s not found", changePassPost.Email)
+		http.Error(w, "{\"status\" : \"not found\"}", http.StatusNotFound)
+		return
+	}
+
+
+	if user.Confirmed == zeroTime {
+		log.Printf("ChangeUserPassword email not confirmed")
+		http.Error(w, "{\"status\" : \"user not confirmed email\"}", http.StatusBadRequest)
+		return		
+	}	
+
+	if err=CompareBcryptHashAndPassword(user.PasswordHash, changePassPost.OldPassword); err!=nil{
+		log.Printf("ChangeUserPassword wrong password")
+		http.Error(w, "{\"status\" : \"wrong password\"}", http.StatusBadRequest)
+		return
+	}
+
+	user.PasswordHash = GetBcryptHash(changePassPost.NewPassword)
+
+	err = setUserInfoToDB(user)
+	if err != nil {
+		log.Printf("RegisterNewUser setUserInfoToDB error %v", err)
+		http.Error(w, "{\"status\" : \"set user error\"}", http.StatusInternalServerError)
+		return
+	}
+
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("{\n\"status\":\"ok\"\n}"))
 }
+

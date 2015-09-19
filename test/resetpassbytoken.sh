@@ -1,0 +1,1 @@
+curl -v -XPOST -H "Content-Type: application/json" -d '{"email":"kosmodb@gmail.com","password":"123456789","token":"18082a409b2b4b65a277ff0f0037ec44"}' http://localhost:8000/api/v1/users/password/reset
